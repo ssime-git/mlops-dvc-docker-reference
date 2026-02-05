@@ -4,12 +4,15 @@ Train stage: Train model and log to MLflow/DagsHub with promotion logic
 
 import json
 import logging
+import subprocess
 from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
 import pandas as pd
 import yaml
+from dvc_lineage import format_lineage_info, log_dagshub_lineage_tags
+from mlflow.data.pandas_dataset import from_pandas
 from mlflow.tracking import MlflowClient
 from sklearn.ensemble import RandomForestClassifier
 
@@ -17,6 +20,31 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def get_git_commit():
+    """Get current git commit hash from workspace"""
+    try:
+        # Configure git to trust workspace directory
+        subprocess.run(
+            ["git", "config", "--global", "--add", "safe.directory", "/workspace"],
+            stderr=subprocess.DEVNULL,
+        )
+
+        # Get commit hash
+        commit = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd="/workspace",
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
+        return commit
+    except Exception as e:
+        logger.warning(f"Could not get git commit: {e}")
+        return None
 
 
 def load_params():
@@ -56,6 +84,47 @@ def tag_model(client, model_name, version, tags):
     """Add tags to model version"""
     for key, value in tags.items():
         client.set_model_version_tag(model_name, str(version), key, value)
+
+
+def get_data_version():
+    """Get DVC data version from dvc.lock with detailed metadata"""
+    import hashlib
+
+    dvc_lock_path = Path("/workspace/dvc.lock")
+    if not dvc_lock_path.exists():
+        return None, {}
+
+    try:
+        with open(dvc_lock_path) as f:
+            dvc_lock = yaml.safe_load(f)
+
+        # Get hashes for data outputs
+        data_hashes = {}
+        data_metadata = {}
+
+        for stage_name, stage_data in dvc_lock.get("stages", {}).items():
+            if stage_name in ["ingest", "preprocess"]:
+                for out in stage_data.get("outs", []):
+                    if "md5" in out:
+                        path = out.get("path", "unknown")
+                        md5_hash = out["md5"]
+                        size = out.get("size", 0)
+
+                        data_hashes[path] = md5_hash
+                        data_metadata[path] = {
+                            "md5": md5_hash,
+                            "size": size,
+                            "stage": stage_name,
+                        }
+
+        # Create combined hash
+        combined = "_".join(f"{k}:{v}" for k, v in sorted(data_hashes.items()))
+        version_hash = hashlib.md5(combined.encode()).hexdigest()[:8]
+
+        return version_hash, data_metadata
+    except Exception as e:
+        logger.warning(f"Could not get data version: {e}")
+        return None, {}
 
 
 def promote_model(
@@ -104,6 +173,12 @@ def promote_model(
 def main():
     logger.info("Starting model training")
 
+    # Get data version and metadata
+    data_version, data_metadata = get_data_version()
+    if data_version:
+        logger.info(f"Data version: {data_version}")
+        logger.info(f"Data metadata: {data_metadata}")
+
     # Load parameters
     params = load_params()
     n_estimators = params.get("n_estimators", 100)
@@ -131,6 +206,12 @@ def main():
 
     # Start MLflow run
     with mlflow.start_run(run_name="iris-rf-train") as run:
+        # Log git commit for reproducibility
+        git_commit = get_git_commit()
+        if git_commit:
+            mlflow.set_tag("git_commit", git_commit)
+            logger.info(f"Git commit: {git_commit}")
+
         # Log parameters
         mlflow.log_params(
             {
@@ -140,6 +221,49 @@ def main():
                 "model_type": "RandomForest",
             }
         )
+
+        # Log data version for lineage
+        if data_version:
+            mlflow.log_param("data_version", data_version)
+            mlflow.set_tag("dvc_data_version", data_version)
+
+            # Log detailed DVC metadata for each dataset
+            for path, metadata in data_metadata.items():
+                mlflow.set_tag(f"dvc_{path.replace('/', '_')}_md5", metadata["md5"])
+                mlflow.log_param(f"dvc_{path.replace('/', '_')}_size", metadata["size"])
+
+        # Create MLflow datasets with DVC metadata for data lineage
+        # Use local paths as source since MLflow doesn't recognize dvc:// protocol
+        train_dataset = from_pandas(
+            train_df,
+            source="/data/processed/train.csv",
+            name="train_data",
+            targets="target",
+        )
+
+        test_dataset = from_pandas(
+            test_df,
+            source="/data/processed/test.csv",
+            name="test_data",
+            targets="target",
+        )
+
+        # Log datasets to MLflow for lineage tracking
+        # DVC metadata is tracked via tags and params above
+        mlflow.log_input(train_dataset, context="training")
+        mlflow.log_input(test_dataset, context="testing")
+
+        logger.info("Logged datasets to MLflow for lineage tracking")
+
+        # Log DagHub URLs for data lineage
+        log_dagshub_lineage_tags(mlflow, data_metadata)
+
+        # Create and log lineage info as artifact
+        lineage_info = format_lineage_info(data_version, data_metadata)
+        lineage_path = Path("/tmp/data_lineage.md")
+        lineage_path.write_text(lineage_info)
+        mlflow.log_artifact(str(lineage_path), "lineage")
+        logger.info("Logged DagHub lineage information")
 
         # Train model
         model = RandomForestClassifier(
@@ -180,6 +304,7 @@ def main():
         "promoted_to_production": promoted,
         "model_type": "RandomForest",
         "params": {"n_estimators": n_estimators, "max_depth": max_depth},
+        "data_version": data_version,
     }
 
     output_dir = Path("/models")

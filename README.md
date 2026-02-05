@@ -1,86 +1,97 @@
-# MLOps Pipeline with DVC + Docker + DagsHub
+# MLOps Pipeline with DVC + Docker + DagHub
 
-ML pipeline orchestration using containerized stages, data versioning, and experiment tracking.
+Containerized, reproducible ML pipeline with DVC data versioning and MLflow tracking on DagHub.
 
-## Quick Start
+## Prerequisites
+- Docker & Docker Compose
+- DagHub account (MLflow endpoint)
+- Git
+
+## Setup
 
 ```bash
 git clone https://github.com/ssime-git/mlops-dvc-docker-reference.git
 cd mlops-dvc-docker-reference
-make setup-env
-# Edit .env with your DagsHub credentials
-make build
-make run
-make push
+make setup-env               # creates .env; fill credentials
+make build                   # build stage images
 ```
 
-## Configuration
+## Run
 
-Create `.env`:
 ```bash
+make run            # run pipeline locally
+make run-push       # run + push data/model to DagHub
+make status         # pipeline status
+make restore        # pull exact data from DagHub
+```
+
+## Restore
+
+```bash
+make restore        # pulls data per dvc.lock (requires DagHub creds)
+```
+
+## Reproduce
+
+- From registry metadata: `make reproduce MODEL=iris-classifier VERSION=<n|alias> ARGS=--update-params`
+- From saved JSON (worktree-isolated):
+
+  ```bash
+  export DAGSHUB_USER_NAME=... DAGSHUB_TOKEN=... MLFLOW_TRACKING_URI=...
+  make reproduce-json FILE=experiment_<run>.json WORKTREE=/tmp/repro-<hash>
+  ```
+  
+Creates a git worktree at the recorded commit, updates params, then runs `dvc pull` and `dvc repro` inside Docker.
+
+Example (reproduce production model; grab the commit’s `dvc.lock`, pull matching data, then run):
+
+```bash
+make reproduce MODEL=iris-classifier VERSION=production ARGS=--update-params
+# Output shows git commit, e.g., 1ea53d7
+commit=1ea53d7
+work=/tmp/repro-$commit
+git worktree add "$work" "$commit"   # reads that commit’s dvc.lock without touching main
+cd "$work"
+make restore                            # pulls data per that dvc.lock
+make run                                # reproduces with matching code+data
+cd -
+git worktree remove "$work"
+```
+
+## Environment
+`.env` (MLflow/DagHub):
+
+```
 DAGSHUB_USER_NAME=your-username
 DAGSHUB_TOKEN=your-token
 MLFLOW_TRACKING_URI=https://dagshub.com/your-username/your-repo.mlflow
+MLFLOW_TRACKING_USERNAME=your-username
+MLFLOW_TRACKING_PASSWORD=your-token
 ```
 
-Configure DVC remote in `.dvc/config.local`:
-```bash
+`.dvc/config.local` (DVC remote):
+
+```
 dvc remote modify origin --local auth basic
 dvc remote modify origin --local user YOUR_USER
 dvc remote modify origin --local password YOUR_TOKEN
 ```
 
-## Commands
+## Operational Guardrails
+- Docker socket mount in `docker-compose.yml` is privileged; remove if nested Docker not required.
+- Keep secrets in `.env` / `.dvc/config.local`; never commit them. Rotate tokens regularly.
+- Run commands from repo root so volume mounts resolve correctly.
 
+## Documentation (essentials)
+- `docs/README.md` – setup, run/restore, reproduction, lineage, promotion, guardrails
+
+## Troubleshooting
+- DVC/MLflow auth errors: recheck `.env` and `.dvc/config.local`.
+- Data mismatch: verify `data_version` and `dvc.lock` match the target commit.
+- Pipelines not writing data: ensure commands are run from repo root so mounts resolve.
+
+## Testing
 ```bash
-make build          # Build Docker images
-make run            # Run pipeline (local only)
-make run-push       # Run pipeline + push to DagsHub
-make push           # Push data to DagsHub
-make status         # Check pipeline status
+make test                      # full pipeline via Docker
+docker-compose run --rm dvc-runner pytest tests/test_lineage.py
 ```
-
-**Note**: `dvc repro` runs the pipeline locally. Use `dvc push` or `make push` to upload results to DagsHub storage.
-
-## Reproduce Experiment
-
-```bash
-# View experiment parameters for a model
-make reproduce MODEL=iris-classifier VERSION=production
-
-# Auto-update params.yaml and reproduce
-make reproduce MODEL=iris-classifier VERSION=production ARGS=--update-params
-make run
-```
-
-See `docs/REPRODUCE_EXPERIMENT.md` for details.
-
-## Pipeline Stages
-
-1. **ingest**: Download Iris dataset
-2. **preprocess**: Split train/test (80/20)
-3. **train**: Train RandomForest, compare with production, promote if better
-4. **evaluate**: Calculate metrics
-
-## Model Promotion
-
-Training automatically compares with production model:
-- Better accuracy → promote to Production
-- Otherwise → register in Staging
-
-## Project Structure
-
-```
-├── dvc.yaml        # Pipeline definition
-├── params.yaml     # Hyperparameters
-├── stages/         # Stage scripts
-├── data/           # DVC tracked
-├── models/         # DVC tracked
-└── metrics/        # Outputs
-```
-
-## Links
-
-- GitHub: https://github.com/ssime-git/mlops-dvc-docker-reference
-- DagsHub: https://dagshub.com/ssime-git/mlops-dvc-docker-reference
-- Docs: See `docs/` for technical details

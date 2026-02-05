@@ -1,7 +1,11 @@
 {
-  "run_id": "4068d4d1e3b94b2f8b2e99857dca0aeb",
-  "model_version": "5",
+  "run_id": "c37447cc78ca4cd683b50c88dbb2d88c",
+  "model_version": "10",
   "params": {
+    "dvc_data_processed_test.csv_size": "617",
+    "dvc_data_processed_train.csv_size": "2237",
+    "data_version": "9803afdd",
+    "dvc_data_raw_iris.csv_size": "4189",
     "n_estimators": "100",
     "max_depth": "5",
     "random_state": "42",
@@ -15,6 +19,6 @@
     "eval_recall": 0.9333333333333333,
     "eval_f1": 0.9333333333333333
   },
-  "data_version": null,
-  "git_commit": null
+  "data_version": "9803afdd",
+  "git_commit": "1ea53d73b7b765d84fa0e02c8347c3e4566e3279"
 }

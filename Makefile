@@ -16,6 +16,7 @@ help:
 	@echo "Data:"
 	@echo "  make push          - Push to DagsHub"
 	@echo "  make pull          - Pull from DagsHub"
+	@echo "  make restore       - Restore everything from DagsHub"
 	@echo "  make status        - Show status"
 	@echo "  make dag           - Show DAG"
 	@echo ""
@@ -54,6 +55,11 @@ push:
 pull:
 	docker-compose run --rm dvc-runner dvc pull
 
+restore:
+	@echo "🔄 Restoring from DagHub..."
+	@$(MAKE) pull
+	@echo "✅ Data restored! Run 'make run' to reproduce."
+
 status:
 	docker-compose run --rm dvc-runner dvc status
 
@@ -79,3 +85,9 @@ test:
 
 reproduce:
 	@docker-compose run --rm dvc-runner python scripts/reproduce_experiment.py $(MODEL) $(VERSION) $(ARGS)
+
+reproduce-json:
+	@if [ -z "$(FILE)" ]; then echo "Usage: make reproduce-json FILE=experiment_<run>.json [WORKTREE=/tmp/repro-<hash>]"; exit 1; fi
+	@FILE=$(FILE) WORKTREE=$(WORKTREE) bash scripts/reproduce_from_json.sh
+
+

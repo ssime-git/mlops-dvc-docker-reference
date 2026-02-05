@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Reproduce an experiment from a model in the registry
+Shows exact parameters and data used - just copy and run
 """
 
 import argparse
@@ -21,43 +22,44 @@ def get_experiment_info(model_name, version_or_alias):
         mv = client.get_model_version_by_alias(model_name, version_or_alias)
     except:
         # Otherwise treat as version number
-        mv = client.get_registered_model_version(model_name, version_or_alias)
+        mv = client.get_model_version(model_name, version_or_alias)
 
     # Get run
     run = client.get_run(mv.run_id)
+
+    # Extract info
+    data_version = run.data.params.get("data_version") or run.data.tags.get(
+        "dvc_data_version"
+    )
+    git_commit = run.data.tags.get("git_commit")
 
     return {
         "run_id": run.info.run_id,
         "model_version": mv.version,
         "params": run.data.params,
         "metrics": run.data.metrics,
-        "tags": {k: v for k, v in mv.tags.items()},
-        "model_uri": f"models:/{model_name}@{version_or_alias}",
+        "data_version": data_version,
+        "git_commit": git_commit,
     }
 
 
 def update_params_yaml(params, output_file="params.yaml"):
     """Update params.yaml with experiment parameters"""
-
-    # Load current params
     with open(output_file) as f:
         current_params = yaml.safe_load(f)
 
-    # Update train section
     if "train" not in current_params:
         current_params["train"] = {}
 
     # Update from MLflow params
     for key, value in params.items():
         if key in ["n_estimators", "max_depth", "random_state"]:
-            # Convert string to int
             current_params["train"][key] = int(value)
 
-    # Write back
     with open(output_file, "w") as f:
         yaml.dump(current_params, f, default_flow_style=False)
 
-    print(f"Updated {output_file}")
+    print(f"✅ Updated {output_file}")
 
 
 def main():
@@ -69,47 +71,56 @@ def main():
         "version", help="Version number or alias (e.g., 5, production, staging)"
     )
     parser.add_argument(
-        "--update-params", action="store_true", help="Automatically update params.yaml"
+        "--update-params", action="store_true", help="Update params.yaml automatically"
     )
 
     args = parser.parse_args()
 
     # Get experiment info
-    print(f"Retrieving experiment info for {args.model_name} @ {args.version}...")
+    print(f"🔍 Retrieving {args.model_name} @ {args.version}...\n")
     info = get_experiment_info(args.model_name, args.version)
 
-    print(f"\nExperiment Details:")
-    print(f"  Run ID: {info['run_id']}")
-    print(f"  Model Version: {info['model_version']}")
+    # Display info
+    print(f"📊 Experiment Details:")
+    print(f"   Run ID: {info['run_id']}")
+    print(f"   Model Version: {info['model_version']}")
+    print(f"   Data Version: {info['data_version']}")
+    if info.get("git_commit"):
+        print(f"   Git Commit: {info['git_commit'][:7]}")
 
-    print(f"\nParameters:")
+    print(f"\n⚙️  Parameters:")
     for key, value in info["params"].items():
-        print(f"  {key}: {value}")
+        if key in ["n_estimators", "max_depth", "random_state"]:
+            print(f"   {key}: {value}")
 
-    print(f"\nMetrics:")
+    print(f"\n📈 Metrics:")
     for key, value in info["metrics"].items():
-        print(f"  {key}: {value:.4f}")
+        if "accuracy" in key:
+            print(f"   {key}: {value:.4f}")
 
-    print(f"\nTags:")
-    for key, value in info["tags"].items():
-        print(f"  {key}: {value}")
-
-    # Save to file
+    # Save
     output_file = f"experiment_{info['run_id']}.json"
     with open(output_file, "w") as f:
         json.dump(info, f, indent=2)
-    print(f"\nSaved to: {output_file}")
 
-    # Update params if requested
+    # Update params
     if args.update_params:
         update_params_yaml(info["params"])
-        print("\nTo reproduce:")
-        print("  make run")
+
+    # Instructions
+    print(f"\n🔄 To reproduce:")
+    if info.get("git_commit"):
+        print(f"   1. git checkout {info['git_commit'][:7]}  # Get correct dvc.lock")
+        print(f"   2. make restore                          # Pull exact data")
+        print(f"   3. make run                              # Reproduce")
+        print(f"   4. git checkout main                     # Return to main")
     else:
-        print("\nTo reproduce:")
-        print(f"  1. Update params.yaml with the parameters above")
-        print(f"  2. make run")
-        print(f"\nOr run with --update-params to auto-update params.yaml")
+        print(f"   ⚠️  No git commit found in this run")
+        print(f"   1. make restore  # Pull current data")
+        print(f"   2. make run      # Reproduce (may differ if data changed)")
+
+    if not args.update_params:
+        print(f"\n💡 Tip: Use --update-params to auto-update params.yaml")
 
 
 if __name__ == "__main__":
