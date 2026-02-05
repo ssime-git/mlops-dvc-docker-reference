@@ -2,9 +2,7 @@
 
 help:
 	@echo "Setup:"
-	@echo "  make setup         - Setup .env and dvc.yaml"
 	@echo "  make setup-env     - Create .env file"
-	@echo "  make setup-dvc     - Generate dvc.yaml with correct paths"
 	@echo "  make build         - Build Docker images"
 	@echo ""
 	@echo "Pipeline:"
@@ -28,12 +26,6 @@ help:
 
 setup-env:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env"; else echo ".env exists"; fi
-
-setup-dvc:
-	@./generate-dvc-yaml.sh
-
-setup: setup-env setup-dvc
-	@echo "Setup complete"
 
 build:
 	docker-compose build

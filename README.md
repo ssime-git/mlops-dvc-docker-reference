@@ -27,8 +27,8 @@ GitHub (Code) <-> DagsHub (Mirror + Data + MLflow)
 git clone https://github.com/ssime-git/mlops-dvc-docker-reference.git
 cd mlops-dvc-docker-reference
 
-# 2. Setup (generates dvc.yaml with correct paths + creates .env)
-make setup
+# 2. Setup credentials
+make setup-env
 # Edit .env with your DagsHub token
 
 # 3. Build and run
@@ -46,9 +46,9 @@ DAGSHUB_TOKEN=your-token
 MLFLOW_TRACKING_URI=https://dagshub.com/your-username/your-repo.mlflow
 ```
 
-### dvc.yaml generation
-Run `make setup-dvc` to auto-generate dvc.yaml with correct paths.
-File is generated from `dvc.yaml.template` using current directory.
+### dvc.yaml paths
+Paths are automatically resolved using $PROJECT_PATH environment variable.
+Set by docker-compose from current directory (${PWD}).
 
 ## Common Commands
 
@@ -104,7 +104,7 @@ Check model stage on DagsHub: Models tab -> iris-classifier
 ## Troubleshooting
 
 **"output does not exist"**
-Run `make setup-dvc` to regenerate dvc.yaml with correct paths.
+Verify PROJECT_PATH is set correctly in docker-compose environment.
 
 **MLflow authentication fails**
 Verify `.env` credentials and `params.yaml` mlflow section.

@@ -22,6 +22,8 @@ services:
             - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
             - MLFLOW_TRACKING_USERNAME=${DAGSHUB_USER_NAME}
             - MLFLOW_TRACKING_PASSWORD=${DAGSHUB_TOKEN}
+            # Project path for volume mounts
+            - PROJECT_PATH=${PWD}
         working_dir: /workspace
         networks:
             - mlops-network
