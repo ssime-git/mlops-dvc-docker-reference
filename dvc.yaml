@@ -1,70 +1,70 @@
 stages:
-  ingest:
-    cmd: >
-      docker run --rm
-      -v $(pwd)/data:/data
-      mlops-ingest
-      python ingest.py
-    deps:
-      - stages/ingest/ingest.py
-    outs:
-      - data/raw/iris.csv
+    ingest:
+        cmd: >
+            docker run --rm
+            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+            mlops-ingest
+            python ingest.py
+        deps:
+            - stages/ingest/ingest.py
+        outs:
+            - data/raw/iris.csv
 
-  preprocess:
-    cmd: >
-      docker run --rm
-      -v $(pwd)/data:/data
-      mlops-preprocess
-      python preprocess.py
-    deps:
-      - stages/preprocess/preprocess.py
-      - data/raw/iris.csv
-    outs:
-      - data/processed/train.csv
-      - data/processed/test.csv
+    preprocess:
+        cmd: >
+            docker run --rm
+            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+            mlops-preprocess
+            python preprocess.py
+        deps:
+            - stages/preprocess/preprocess.py
+            - data/raw/iris.csv
+        outs:
+            - data/processed/train.csv
+            - data/processed/test.csv
 
-  train:
-    cmd: >
-      docker run --rm
-      -v $(pwd)/data:/data
-      -v $(pwd)/models:/models
-      -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
-      -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
-      -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
-      mlops-train
-      python train.py
-    deps:
-      - stages/train/train.py
-      - data/processed/train.csv
-      - data/processed/test.csv
-    params:
-      - train.n_estimators
-      - train.max_depth
-      - train.random_state
-    # Note: Model saved to MLflow/DagsHub, not locally
-    # Only tracking metadata here
-    outs:
-      - models/model_metadata.json
+    train:
+        cmd: >
+            docker run --rm
+            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+            -v /home/seb/project/mlops-dvc-docker-reference/models:/models
+            -e MLFLOW_TRACKING_URI=${mlflow.tracking_uri}
+            -e MLFLOW_TRACKING_USERNAME=${mlflow.tracking_username}
+            -e MLFLOW_TRACKING_PASSWORD=${mlflow.tracking_password}
+            mlops-train
+            python train.py
+        deps:
+            - stages/train/train.py
+            - data/processed/train.csv
+            - data/processed/test.csv
+        params:
+            - train.n_estimators
+            - train.max_depth
+            - train.random_state
+        # Note: Model saved to MLflow/DagsHub, not locally
+        # Only tracking metadata here
+        outs:
+            - models/model_metadata.json
 
-  evaluate:
-    cmd: >
-      docker run --rm
-      -v $(pwd)/data:/data
-      -v $(pwd)/models:/models
-      -v $(pwd)/metrics:/metrics
-      -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
-      -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
-      -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
-      mlops-evaluate
-      python evaluate.py
-    deps:
-      - stages/evaluate/evaluate.py
-      - data/processed/test.csv
-      - models/model_metadata.json
-    metrics:
-      - metrics/metrics.json:
-          cache: false
-    plots:
-      - metrics/confusion_matrix.json:
-          cache: false
-          template: confusion
+    evaluate:
+        cmd: >
+            docker run --rm
+            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+            -v /home/seb/project/mlops-dvc-docker-reference/models:/models
+            -v /home/seb/project/mlops-dvc-docker-reference/metrics:/metrics
+            -e MLFLOW_TRACKING_URI=${mlflow.tracking_uri}
+            -e MLFLOW_TRACKING_USERNAME=${mlflow.tracking_username}
+            -e MLFLOW_TRACKING_PASSWORD=${mlflow.tracking_password}
+            mlops-evaluate
+            python evaluate.py
+        deps:
+            - stages/evaluate/evaluate.py
+            - data/processed/test.csv
+            - models/model_metadata.json
+        metrics:
+            - metrics/metrics.json:
+                  cache: false
+        plots:
+            - metrics/confusion_matrix.json:
+                  cache: false
+                  template: confusion

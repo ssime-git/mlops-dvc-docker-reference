@@ -1,0 +1,92 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: "docker run --rm -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+      mlops-ingest python ingest.py\n"
+    deps:
+    - path: stages/ingest/ingest.py
+      hash: md5
+      md5: a0767426cae3ee3528b62933381e156e
+      size: 851
+    outs:
+    - path: data/raw/iris.csv
+      hash: md5
+      md5: 9b81a5b2beab90b5e381dfb33627d536
+      size: 4189
+  preprocess:
+    cmd: "docker run --rm -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+      mlops-preprocess python preprocess.py\n"
+    deps:
+    - path: data/raw/iris.csv
+      hash: md5
+      md5: 9b81a5b2beab90b5e381dfb33627d536
+      size: 4189
+    - path: stages/preprocess/preprocess.py
+      hash: md5
+      md5: 34573280a9b45676080e02a824e799ce
+      size: 1823
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 12633f6b7b7282fb932761e33b24d21d
+      size: 617
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 47fd89ce6c52daa555a94670836c67a2
+      size: 2237
+  train:
+    cmd: "docker run --rm -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+      -v /home/seb/project/mlops-dvc-docker-reference/models:/models -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+      -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME} -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+      mlops-train python train.py\n"
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 12633f6b7b7282fb932761e33b24d21d
+      size: 617
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 47fd89ce6c52daa555a94670836c67a2
+      size: 2237
+    - path: stages/train/train.py
+      hash: md5
+      md5: 6accdc5282cde8765d8cfeb56c37249f
+      size: 3361
+    params:
+      params.yaml:
+        train.max_depth: 5
+        train.n_estimators: 100
+        train.random_state: 42
+    outs:
+    - path: models/model_metadata.json
+      hash: md5
+      md5: a0bbadd7ce3ed7010157487955e3d134
+      size: 209
+  evaluate:
+    cmd: "docker run --rm -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+      -v /home/seb/project/mlops-dvc-docker-reference/models:/models -v /home/seb/project/mlops-dvc-docker-reference/metrics:/metrics
+      -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI} -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
+      -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD} mlops-evaluate python
+      evaluate.py\n"
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 12633f6b7b7282fb932761e33b24d21d
+      size: 617
+    - path: models/model_metadata.json
+      hash: md5
+      md5: a0bbadd7ce3ed7010157487955e3d134
+      size: 209
+    - path: stages/evaluate/evaluate.py
+      hash: md5
+      md5: 2d2007f566ea3132f88681b3d04e9ba1
+      size: 2481
+    outs:
+    - path: metrics/confusion_matrix.json
+      hash: md5
+      md5: 54297f8eb6bc045b60c43f35b94ee6d2
+      size: 203
+    - path: metrics/metrics.json
+      hash: md5
+      md5: 3424e7d1e3954823a2918290ed086c1a
+      size: 137
