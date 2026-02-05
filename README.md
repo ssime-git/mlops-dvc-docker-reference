@@ -34,10 +34,13 @@ dvc remote modify origin --local password YOUR_TOKEN
 
 ```bash
 make build          # Build Docker images
-make run            # Run pipeline
+make run            # Run pipeline (local only)
+make run-push       # Run pipeline + push to DagsHub
 make push           # Push data to DagsHub
 make status         # Check pipeline status
 ```
+
+**Note**: `dvc repro` runs the pipeline locally. Use `dvc push` or `make push` to upload results to DagsHub storage.
 
 ## Pipeline Stages
 

@@ -6,7 +6,8 @@ help:
 	@echo "  make build         - Build Docker images"
 	@echo ""
 	@echo "Pipeline:"
-	@echo "  make run           - Run complete pipeline"
+	@echo "  make run           - Run pipeline (local only)"
+	@echo "  make run-push      - Run pipeline + push to DagsHub"
 	@echo "  make run-ingest    - Run ingest stage"
 	@echo "  make run-preprocess- Run preprocess stage"
 	@echo "  make run-train     - Run train stage"
@@ -32,6 +33,8 @@ build:
 
 run:
 	docker-compose run --rm dvc-runner dvc repro
+
+run-push: run push
 
 run-ingest:
 	docker-compose run --rm dvc-runner dvc repro ingest
