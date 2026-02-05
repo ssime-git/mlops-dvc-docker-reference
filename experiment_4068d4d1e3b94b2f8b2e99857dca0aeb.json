@@ -1,0 +1,24 @@
+{
+  "run_id": "4068d4d1e3b94b2f8b2e99857dca0aeb",
+  "model_version": "5",
+  "params": {
+    "n_estimators": "100",
+    "max_depth": "5",
+    "random_state": "42",
+    "model_type": "RandomForest"
+  },
+  "metrics": {
+    "train_accuracy": 1.0,
+    "test_accuracy": 0.9333333333333333,
+    "eval_accuracy": 0.9333333333333333,
+    "eval_precision": 0.9333333333333333,
+    "eval_recall": 0.9333333333333333,
+    "eval_f1": 0.9333333333333333
+  },
+  "tags": {
+    "promoted": "true",
+    "promotion_reason": "first_model",
+    "test_accuracy": "0.9333333333333333"
+  },
+  "model_uri": "models:/iris-classifier@production"
+}

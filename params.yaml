@@ -1,13 +1,11 @@
 mlflow:
-    tracking_uri: ${MLFLOW_TRACKING_URI}
-    tracking_username: ${MLFLOW_TRACKING_USERNAME}
-    tracking_password: ${MLFLOW_TRACKING_PASSWORD}
-
-train:
-    n_estimators: 100
-    max_depth: 5
-    random_state: 42
-
+  tracking_password: ${MLFLOW_TRACKING_PASSWORD}
+  tracking_uri: ${MLFLOW_TRACKING_URI}
+  tracking_username: ${MLFLOW_TRACKING_USERNAME}
 preprocess:
-    test_size: 0.2
-    random_state: 42
+  random_state: 42
+  test_size: 0.2
+train:
+  max_depth: 5
+  n_estimators: 100
+  random_state: 42

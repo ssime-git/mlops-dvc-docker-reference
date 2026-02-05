@@ -76,3 +76,6 @@ test:
 	@test -f data/processed/test.csv && echo "OK: test data" || echo "FAIL: test data"
 	@test -f models/model_metadata.json && echo "OK: model metadata" || echo "FAIL: model metadata"
 	@test -f metrics/metrics.json && echo "OK: metrics" || echo "FAIL: metrics"
+
+reproduce:
+	@docker-compose run --rm dvc-runner python scripts/reproduce_experiment.py $(MODEL) $(VERSION) $(ARGS)

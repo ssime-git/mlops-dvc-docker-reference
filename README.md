@@ -42,6 +42,19 @@ make status         # Check pipeline status
 
 **Note**: `dvc repro` runs the pipeline locally. Use `dvc push` or `make push` to upload results to DagsHub storage.
 
+## Reproduce Experiment
+
+```bash
+# View experiment parameters for a model
+make reproduce MODEL=iris-classifier VERSION=production
+
+# Auto-update params.yaml and reproduce
+make reproduce MODEL=iris-classifier VERSION=production ARGS=--update-params
+make run
+```
+
+See `docs/REPRODUCE_EXPERIMENT.md` for details.
+
 ## Pipeline Stages
 
 1. **ingest**: Download Iris dataset
