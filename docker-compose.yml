@@ -1,0 +1,87 @@
+services:
+    dvc-runner:
+        build:
+            context: .
+            dockerfile: Dockerfile.dvc-runner
+        image: mlops-dvc-runner
+        container_name: dvc-orchestrator
+        volumes:
+            # Mount workspace
+            - .:/workspace
+            # CRITICAL: Mount Docker socket (research why!)
+            - /var/run/docker.sock:/var/run/docker.sock
+            # Shared volumes for pipeline data
+            - ./data:/workspace/data
+            - ./models:/workspace/models
+            - ./metrics:/workspace/metrics
+        environment:
+            # DagsHub credentials (set these!)
+            - DAGSHUB_USER_NAME=${DAGSHUB_USER_NAME}
+            - DAGSHUB_TOKEN=${DAGSHUB_TOKEN}
+            # MLflow tracking
+            - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+            - MLFLOW_TRACKING_USERNAME=${DAGSHUB_USER_NAME}
+            - MLFLOW_TRACKING_PASSWORD=${DAGSHUB_TOKEN}
+        working_dir: /workspace
+        networks:
+            - mlops-network
+
+    # Individual stage services (for testing)
+    ingest:
+        build:
+            context: ./stages/ingest
+            dockerfile: Dockerfile
+        image: mlops-ingest
+        volumes:
+            - ./data:/data
+        networks:
+            - mlops-network
+
+    preprocess:
+        build:
+            context: ./stages/preprocess
+            dockerfile: Dockerfile
+        image: mlops-preprocess
+        volumes:
+            - ./data:/data
+        networks:
+            - mlops-network
+
+    train:
+        build:
+            context: ./stages/train
+            dockerfile: Dockerfile
+        image: mlops-train
+        volumes:
+            - ./data:/data
+            - ./models:/models
+        environment:
+            - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+            - MLFLOW_TRACKING_USERNAME=${DAGSHUB_USER_NAME}
+            - MLFLOW_TRACKING_PASSWORD=${DAGSHUB_TOKEN}
+        networks:
+            - mlops-network
+
+    evaluate:
+        build:
+            context: ./stages/evaluate
+            dockerfile: Dockerfile
+        image: mlops-evaluate
+        volumes:
+            - ./data:/data
+            - ./models:/models
+            - ./metrics:/metrics
+        environment:
+            - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+            - MLFLOW_TRACKING_USERNAME=${DAGSHUB_USER_NAME}
+            - MLFLOW_TRACKING_PASSWORD=${DAGSHUB_TOKEN}
+        networks:
+            - mlops-network
+
+networks:
+    mlops-network:
+        driver: bridge
+# Usage:
+# docker-compose build                    # Build all images
+# docker-compose run dvc-runner dvc repro # Run pipeline
+# docker-compose run ingest python ingest.py  # Test individual stage

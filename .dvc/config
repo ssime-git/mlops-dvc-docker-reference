@@ -1,0 +1,9 @@
+[core]
+    remote = origin
+    autostage = true
+
+# Configure with DagsHub remote:
+# dvc remote add origin https://dagshub.com/YOUR_USER/mlops-pipeline.dvc
+# dvc remote modify origin --local auth basic
+# dvc remote modify origin --local user YOUR_USER
+# dvc remote modify origin --local password YOUR_TOKEN
