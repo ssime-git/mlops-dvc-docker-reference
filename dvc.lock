@@ -50,8 +50,8 @@ stages:
       size: 2237
     - path: stages/train/train.py
       hash: md5
-      md5: 45a178225048fa64d76340147df63470
-      size: 5914
+      md5: b308d2b2558b9debd55f631cc8869303
+      size: 6632
     params:
       params.yaml:
         train.max_depth: 5
@@ -60,7 +60,7 @@ stages:
     outs:
     - path: models/model_metadata.json
       hash: md5
-      md5: fb7ba4ce9c7a6d29af6e461f2a35b8cd
+      md5: 0785bc7fe6722b3362993ceb1d47f648
       size: 294
   evaluate:
     cmd: "docker run --rm -v /home/seb/project/mlops-dvc-docker-reference/data:/data
@@ -75,7 +75,7 @@ stages:
       size: 617
     - path: models/model_metadata.json
       hash: md5
-      md5: fb7ba4ce9c7a6d29af6e461f2a35b8cd
+      md5: 0785bc7fe6722b3362993ceb1d47f648
       size: 294
     - path: stages/evaluate/evaluate.py
       hash: md5

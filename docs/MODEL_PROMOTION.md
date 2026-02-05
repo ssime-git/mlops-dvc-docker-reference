@@ -2,25 +2,32 @@
 
 ## Workflow
 
-Training automatically compares new model with production:
+Training automatically compares new model with production using aliases:
 
 ```python
-prod_accuracy = get_production_model_accuracy()
+prod_version, prod_accuracy = get_production_model_version(client, model_name)
 new_accuracy = model.score(X_test, y_test)
 
 if prod_accuracy is None or new_accuracy > prod_accuracy:
-    promote_to_production()
+    set_model_alias(client, model_name, version, "production")
 else:
-    register_in_staging()
+    set_model_alias(client, model_name, version, "staging")
 ```
 
-## Stages
+## Aliases
 
-| Stage | Description |
+| Alias | Description |
 |-------|-------------|
-| Production | Currently deployed model |
-| Staging | Candidate for promotion |
-| Archived | Replaced production model |
+| production | Currently deployed model |
+| staging | Candidate for promotion |
+| archived | Replaced production model |
+
+## Tags
+
+Each model version gets tagged with:
+- `test_accuracy`: Model performance
+- `promoted`: "true" or "false"
+- `promotion_reason`: Why promoted or not
 
 ## View Models
 
@@ -31,17 +38,12 @@ Via API:
 from mlflow.tracking import MlflowClient
 
 client = MlflowClient()
-prod = client.get_latest_versions("iris-classifier", stages=["Production"])
-model = mlflow.sklearn.load_model(f"models:/iris-classifier/Production")
+mv = client.get_model_version_by_alias("iris-classifier", "production")
+model = mlflow.sklearn.load_model(f"models:/iris-classifier@production")
 ```
 
 ## Manual Promotion
 
-DagsHub UI or:
 ```python
-client.transition_model_version_stage(
-    name="iris-classifier",
-    version=2,
-    stage="Production"
-)
+client.set_registered_model_alias("iris-classifier", "production", 2)
 ```

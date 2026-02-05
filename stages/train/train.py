@@ -30,37 +30,47 @@ def load_params():
     return params.get("train", {})
 
 
-def get_production_model_accuracy(client, model_name):
-    """Get accuracy of current production model"""
+def get_production_model_version(client, model_name):
+    """Get current production model using aliases"""
     try:
-        # Get production version
-        prod_versions = client.get_latest_versions(model_name, stages=["Production"])
-        if not prod_versions:
-            logger.info("No production model found")
-            return None
-
-        prod_version = prod_versions[0]
-        # Get run that created this model version
-        run = client.get_run(prod_version.run_id)
+        # Try to get model with 'production' alias
+        mv = client.get_model_version_by_alias(model_name, "production")
+        run = client.get_run(mv.run_id)
         prod_accuracy = run.data.metrics.get("test_accuracy")
-
         logger.info(
-            f"Production model (v{prod_version.version}): test_accuracy={prod_accuracy:.4f}"
+            f"Production model (v{mv.version}): test_accuracy={prod_accuracy:.4f}"
         )
-        return prod_accuracy
-    except Exception as e:
-        logger.warning(f"Could not retrieve production model: {e}")
-        return None
+        return mv.version, prod_accuracy
+    except mlflow.exceptions.RestException:
+        logger.info("No production model found")
+        return None, None
 
 
-def promote_model(client, model_name, version, current_accuracy, prod_accuracy):
+def set_model_alias(client, model_name, version, alias):
+    """Set alias for model version"""
+    client.set_registered_model_alias(model_name, alias, str(version))
+    logger.info(f"Set alias '{alias}' for model v{version}")
+
+
+def tag_model(client, model_name, version, tags):
+    """Add tags to model version"""
+    for key, value in tags.items():
+        client.set_model_version_tag(model_name, str(version), key, value)
+
+
+def promote_model(
+    client, model_name, version, current_accuracy, prod_version, prod_accuracy
+):
     """Decide if model should be promoted to production"""
+    tags = {"test_accuracy": str(current_accuracy), "promoted": "false"}
+
     if prod_accuracy is None:
         # No production model exists, promote this one
         logger.info("No existing production model, promoting new model")
-        client.transition_model_version_stage(
-            name=model_name, version=version, stage="Production"
-        )
+        set_model_alias(client, model_name, version, "production")
+        tags["promoted"] = "true"
+        tags["promotion_reason"] = "first_model"
+        tag_model(client, model_name, version, tags)
         return True
 
     if current_accuracy > prod_accuracy:
@@ -68,22 +78,26 @@ def promote_model(client, model_name, version, current_accuracy, prod_accuracy):
         logger.info(
             f"New model better ({current_accuracy:.4f} > {prod_accuracy:.4f}), promoting to production"
         )
-        # Archive old production model
-        client.transition_model_version_stage(
-            name=model_name,
-            version=version,
-            stage="Production",
-            archive_existing_versions=True,
-        )
+
+        # Archive old production
+        if prod_version:
+            set_model_alias(client, model_name, prod_version, "archived")
+            tag_model(client, model_name, prod_version, {"status": "archived"})
+
+        # Promote new model
+        set_model_alias(client, model_name, version, "production")
+        tags["promoted"] = "true"
+        tags["promotion_reason"] = "better_accuracy"
+        tag_model(client, model_name, version, tags)
         return True
     else:
         # Keep in staging
         logger.info(
             f"New model not better ({current_accuracy:.4f} <= {prod_accuracy:.4f}), keeping in staging"
         )
-        client.transition_model_version_stage(
-            name=model_name, version=version, stage="Staging"
-        )
+        set_model_alias(client, model_name, version, "staging")
+        tags["promotion_reason"] = "insufficient_accuracy"
+        tag_model(client, model_name, version, tags)
         return False
 
 
@@ -112,8 +126,8 @@ def main():
     model_name = "iris-classifier"
     client = MlflowClient()
 
-    # Get current production model accuracy
-    prod_accuracy = get_production_model_accuracy(client, model_name)
+    # Get current production model
+    prod_version, prod_accuracy = get_production_model_version(client, model_name)
 
     # Start MLflow run
     with mlflow.start_run(run_name="iris-rf-train") as run:
@@ -153,7 +167,7 @@ def main():
 
     # Promote model based on comparison
     promoted = promote_model(
-        client, model_name, latest_version, test_score, prod_accuracy
+        client, model_name, latest_version, test_score, prod_version, prod_accuracy
     )
 
     # Save metadata locally
@@ -175,9 +189,10 @@ def main():
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
 
+    alias = "production" if promoted else "staging"
     logger.info(f"Model logged to MLflow/DagsHub, run_id: {run_id}")
     logger.info(f"Model registered as: {model_name} v{latest_version}")
-    logger.info(f"Stage: {'Production' if promoted else 'Staging'}")
+    logger.info(f"Alias: {alias}")
     logger.info(f"Metadata saved: {metadata_path}")
 
 
