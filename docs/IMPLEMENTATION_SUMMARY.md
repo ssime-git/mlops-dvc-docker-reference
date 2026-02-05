@@ -225,19 +225,17 @@ By completing Phase 2 with this pattern, students will:
 
 ## 📅 Timeline Feasibility
 
-**6 days (Jan 30 → Feb 6):**
-
-Day 1-2: DagsHub setup + test reference implementation
-Day 3-4: Build their own microservices + Dockerfiles
-Day 5: DVC orchestration working end-to-end
-Day 6: Documentation + final testing
+* Step 1 : DagsHub setup + test reference implementation
+* Step 2: Build their own microservices + Dockerfiles
+* Step 3: DVC orchestration working end-to-end
+* Step 4: Documentation + final testing
 
 **Challenging but achievable** with the reference implementation as guide.
 
 ## 💡 Suggested Variations for Advanced Students
 
 For students who finish early:
-1. Add a 5th stage (data validation with Great Expectations)
+1. Add a 5th stage (data validation with Great Expectations or Evidently)
 2. Implement parameter sweeps with DVC experiments
 3. Add model comparison in MLflow
 4. Create a deployment stage (load from registry, serve with FastAPI)

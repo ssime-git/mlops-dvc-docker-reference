@@ -1,8 +1,14 @@
+#!/bin/bash
+# Generate dvc.yaml with current project path
+
+PROJECT_PATH=$(pwd)
+
+cat > dvc.yaml << EOF
 stages:
     ingest:
         cmd: >
             docker run --rm
-            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+            -v ${PROJECT_PATH}/data:/data
             mlops-ingest
             python ingest.py
         deps:
@@ -13,7 +19,7 @@ stages:
     preprocess:
         cmd: >
             docker run --rm
-            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
+            -v ${PROJECT_PATH}/data:/data
             mlops-preprocess
             python preprocess.py
         deps:
@@ -26,11 +32,11 @@ stages:
     train:
         cmd: >
             docker run --rm
-            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
-            -v /home/seb/project/mlops-dvc-docker-reference/models:/models
-            -e MLFLOW_TRACKING_URI=${mlflow.tracking_uri}
-            -e MLFLOW_TRACKING_USERNAME=${mlflow.tracking_username}
-            -e MLFLOW_TRACKING_PASSWORD=${mlflow.tracking_password}
+            -v ${PROJECT_PATH}/data:/data
+            -v ${PROJECT_PATH}/models:/models
+            -e MLFLOW_TRACKING_URI=\${mlflow.tracking_uri}
+            -e MLFLOW_TRACKING_USERNAME=\${mlflow.tracking_username}
+            -e MLFLOW_TRACKING_PASSWORD=\${mlflow.tracking_password}
             mlops-train
             python train.py
         deps:
@@ -47,12 +53,12 @@ stages:
     evaluate:
         cmd: >
             docker run --rm
-            -v /home/seb/project/mlops-dvc-docker-reference/data:/data
-            -v /home/seb/project/mlops-dvc-docker-reference/models:/models
-            -v /home/seb/project/mlops-dvc-docker-reference/metrics:/metrics
-            -e MLFLOW_TRACKING_URI=${mlflow.tracking_uri}
-            -e MLFLOW_TRACKING_USERNAME=${mlflow.tracking_username}
-            -e MLFLOW_TRACKING_PASSWORD=${mlflow.tracking_password}
+            -v ${PROJECT_PATH}/data:/data
+            -v ${PROJECT_PATH}/models:/models
+            -v ${PROJECT_PATH}/metrics:/metrics
+            -e MLFLOW_TRACKING_URI=\${mlflow.tracking_uri}
+            -e MLFLOW_TRACKING_USERNAME=\${mlflow.tracking_username}
+            -e MLFLOW_TRACKING_PASSWORD=\${mlflow.tracking_password}
             mlops-evaluate
             python evaluate.py
         deps:
@@ -66,3 +72,6 @@ stages:
             - metrics/confusion_matrix.json:
                   cache: false
                   template: confusion
+EOF
+
+echo "Generated dvc.yaml with PROJECT_PATH=${PROJECT_PATH}"

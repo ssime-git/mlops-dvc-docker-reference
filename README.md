@@ -27,14 +27,11 @@ GitHub (Code) <-> DagsHub (Mirror + Data + MLflow)
 git clone https://github.com/ssime-git/mlops-dvc-docker-reference.git
 cd mlops-dvc-docker-reference
 
-# 2. Configure credentials
-make setup-env
+# 2. Setup (generates dvc.yaml with correct paths + creates .env)
+make setup
 # Edit .env with your DagsHub token
 
-# 3. Update paths in dvc.yaml
-# Replace /home/seb/project/mlops-dvc-docker-reference with your path
-
-# 4. Build and run
+# 3. Build and run
 make build
 make run
 make push
@@ -49,12 +46,9 @@ DAGSHUB_TOKEN=your-token
 MLFLOW_TRACKING_URI=https://dagshub.com/your-username/your-repo.mlflow
 ```
 
-### dvc.yaml paths
-Update all volume mounts from:
-```yaml
--v /home/seb/project/mlops-dvc-docker-reference/data:/data
-```
-To your actual project path.
+### dvc.yaml generation
+Run `make setup-dvc` to auto-generate dvc.yaml with correct paths.
+File is generated from `dvc.yaml.template` using current directory.
 
 ## Common Commands
 
@@ -71,8 +65,17 @@ make test           # Run and verify outputs
 
 1. **ingest**: Download Iris dataset -> `data/raw/iris.csv`
 2. **preprocess**: Split train/test -> `data/processed/{train,test}.csv`
-3. **train**: Train RandomForest -> log to MLflow, register model
+3. **train**: Train RandomForest -> compare with production -> promote if better
 4. **evaluate**: Calculate metrics -> `metrics/metrics.json`
+
+## Model Promotion
+
+Train stage automatically compares new model with current production model:
+- If no production model exists: promote new model to Production
+- If new model has better test accuracy: promote to Production, archive old
+- Otherwise: register as new version in Staging
+
+Check model stage on DagsHub: Models tab -> iris-classifier
 
 ## Project Structure
 
@@ -101,7 +104,7 @@ make test           # Run and verify outputs
 ## Troubleshooting
 
 **"output does not exist"**
-Check that paths in `dvc.yaml` match your local directory.
+Run `make setup-dvc` to regenerate dvc.yaml with correct paths.
 
 **MLflow authentication fails**
 Verify `.env` credentials and `params.yaml` mlflow section.
