@@ -7,6 +7,8 @@ __pycache__/
 env/
 venv/
 .venv/
+.uv-cache/
+.uv-tools/
 
 # DVC
 /data/raw/
@@ -30,3 +32,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local experiment exports (transient reproduction metadata)
+experiment_*.json

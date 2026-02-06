@@ -1,56 +1,79 @@
-# Docs (Concise)
+# Docs
+
+## Current Architecture
+```text
+GitHub <-> DagHub (code, data, MLflow)
+Host/CI DVC orchestration (uvx dvc first, dvc fallback)
+  -> Docker stage containers (ingest, preprocess, train, evaluate)
+```
+
+Default runtime is host-orchestrated (`make run`).  
+Nested Docker (`make run-nested`) is explicit opt-in only.
 
 ## Setup
-- Create DagHub repo and enable GitHub sync.
-- Configure DVC remote (local scope keeps secrets):
-  ```bash
-  dvc remote modify origin --local auth basic
-  dvc remote modify origin --local user YOUR_USER
-  dvc remote modify origin --local password YOUR_TOKEN
-  ```
-- Add MLflow credentials to `.env`:
-  ```bash
-  MLFLOW_TRACKING_URI=https://dagshub.com/YOUR_USER/YOUR_REPO.mlflow
-  MLFLOW_TRACKING_USERNAME=YOUR_USER
-  MLFLOW_TRACKING_PASSWORD=YOUR_TOKEN
-  ```
+1. Create `.env`:
+   ```bash
+   make setup-env
+   ```
+2. Fill credentials in `.env`:
+   ```env
+   DAGSHUB_USER_NAME=...
+   DAGSHUB_TOKEN=...
+   MLFLOW_TRACKING_URI=https://dagshub.com/<user>/<repo>.mlflow
+   MLFLOW_TRACKING_USERNAME=...
+   MLFLOW_TRACKING_PASSWORD=...
+   ```
+3. Configure DVC remote auth (local only):
+   ```bash
+   uvx dvc remote modify origin --local auth basic
+   uvx dvc remote modify origin --local user "$DAGSHUB_USER_NAME"
+   uvx dvc remote modify origin --local password "$DAGSHUB_TOKEN"
+   ```
+4. Build images:
+   ```bash
+   make build
+   ```
 
-## Architecture
-```
-GitHub ↔ DagHub (code, data, MLflow)
-Local → docker-compose → dvc-runner → stage containers (ingest, preprocess, train, evaluate)
-```
-
-## Run & Restore
+## Operations
 ```bash
-make build           # build stage images
-make run             # run pipeline
-make run-push        # run + push data/model to DagHub
-make restore         # pull exact data per dvc.lock
+make run                # recommended (host/CI orchestration)
+make run-nested         # optional nested docker mode
+make run-push           # run + dvc push
+make restore            # dvc pull to current dvc.lock
+make status             # dvc status
+make dag                # dvc dag
 ```
 
-## Reproduce an Experiment
-- Show recorded params/metrics/data/git commit from the registry:
-  ```bash
-  make reproduce MODEL=iris-classifier VERSION=<n|alias> ARGS=--update-params
-  ```
-- Follow the printed instructions (git checkout the commit → `make restore` → `make run` → return to your branch).
-- Data lineage captured in each run: git commit, combined data MD5, per-file MD5 tags, and DagHub URLs to the exact files.
+If you hit `.dvc/tmp` permission issues:
+```bash
+make fix-dvc-perms
+```
 
-## Model Promotion
-- Training compares new accuracy to the production alias; if higher, it updates the `production` alias, otherwise `staging`.
-- Each version is tagged with `test_accuracy`, `promoted`, and `promotion_reason` in MLflow / DagHub.
+## Reproduction
+From model registry metadata:
+```bash
+make reproduce MODEL=iris-classifier VERSION=production ARGS=--update-params
+```
 
-## Docker Socket Note
-- The dvc-runner mounts `/var/run/docker.sock` to launch sibling stage containers. Treat it as privileged; drop the mount if nested Docker is not required.
+From saved run JSON in an isolated worktree:
+```bash
+make reproduce-json FILE=experiment_<run_id>.json WORKTREE=/tmp/repro-<hash>
+```
 
-## Guardrails
-- Configure `.env` and `.dvc/config.local` before running.
-- Run commands from repo root so Docker volume mounts resolve correctly.
-- Commit `params.yaml` with `dvc.lock` to keep code/parameter/data versions aligned.
-- Prefer `docker-compose run --rm dvc-runner dvc repro` for isolation; rotate DagHub tokens regularly.
+`reproduce-json` now uses host-mode DVC (`uvx dvc` first, `dvc` fallback), patches older worktree `dvc.yaml` path/uid issues, and runs `dvc pull` + `dvc repro`.
 
-## Troubleshooting
-- Auth errors: recheck `.env` and `.dvc/config.local` values.
-- Data mismatch: ensure you are on the commit shown by `make reproduce`, then rerun `make restore`.
-- Socket concerns: remove the Docker socket volume if you do not need container-in-container.
+## Quality Gates
+```bash
+make lint               # uvx ruff check .
+make fmt-check          # uvx ruff format --check .
+make test-unit          # pytest lineage tests
+make test-pipeline-smoke
+make test               # unit + full pipeline checks
+```
+
+CI workflow: `.github/workflows/ci.yml`.
+
+## Security Notes
+- `docker-compose.yml` does not mount `/var/run/docker.sock`.
+- `docker-compose.nested.yml` is privileged and only for explicit nested mode.
+- Keep secrets only in `.env` and `.dvc/config.local`.

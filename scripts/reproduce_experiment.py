@@ -6,8 +6,8 @@ Shows exact parameters and data used - just copy and run
 
 import argparse
 import json
+from pathlib import Path
 
-import mlflow
 import yaml
 from mlflow.tracking import MlflowClient
 
@@ -20,7 +20,7 @@ def get_experiment_info(model_name, version_or_alias):
     try:
         # Try as alias first
         mv = client.get_model_version_by_alias(model_name, version_or_alias)
-    except:
+    except Exception:
         # Otherwise treat as version number
         mv = client.get_model_version(model_name, version_or_alias)
 
@@ -81,46 +81,51 @@ def main():
     info = get_experiment_info(args.model_name, args.version)
 
     # Display info
-    print(f"📊 Experiment Details:")
+    print("📊 Experiment Details:")
     print(f"   Run ID: {info['run_id']}")
     print(f"   Model Version: {info['model_version']}")
     print(f"   Data Version: {info['data_version']}")
     if info.get("git_commit"):
         print(f"   Git Commit: {info['git_commit'][:7]}")
 
-    print(f"\n⚙️  Parameters:")
+    print("\n⚙️  Parameters:")
     for key, value in info["params"].items():
         if key in ["n_estimators", "max_depth", "random_state"]:
             print(f"   {key}: {value}")
 
-    print(f"\n📈 Metrics:")
+    print("\n📈 Metrics:")
     for key, value in info["metrics"].items():
         if "accuracy" in key:
             print(f"   {key}: {value:.4f}")
 
     # Save
-    output_file = f"experiment_{info['run_id']}.json"
-    with open(output_file, "w") as f:
-        json.dump(info, f, indent=2)
+    output_file = Path(f"experiment_{info['run_id']}.json")
+    try:
+        output_file.write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    except PermissionError:
+        fallback_dir = Path("/tmp")
+        output_file = fallback_dir / output_file.name
+        output_file.write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+        print(f"⚠️  Default output path not writable, saved to {output_file}")
 
     # Update params
     if args.update_params:
         update_params_yaml(info["params"])
 
     # Instructions
-    print(f"\n🔄 To reproduce:")
+    print("\n🔄 To reproduce:")
     if info.get("git_commit"):
         print(f"   1. git checkout {info['git_commit'][:7]}  # Get correct dvc.lock")
-        print(f"   2. make restore                          # Pull exact data")
-        print(f"   3. make run                              # Reproduce")
-        print(f"   4. git checkout main                     # Return to main")
+        print("   2. make restore                          # Pull exact data")
+        print("   3. make run                              # Reproduce")
+        print("   4. git checkout main                     # Return to main")
     else:
-        print(f"   ⚠️  No git commit found in this run")
-        print(f"   1. make restore  # Pull current data")
-        print(f"   2. make run      # Reproduce (may differ if data changed)")
+        print("   ⚠️  No git commit found in this run")
+        print("   1. make restore  # Pull current data")
+        print("   2. make run      # Reproduce (may differ if data changed)")
 
     if not args.update_params:
-        print(f"\n💡 Tip: Use --update-params to auto-update params.yaml")
+        print("\n💡 Tip: Use --update-params to auto-update params.yaml")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ Montre comment récupérer programmatiquement les informations de lineage
 """
 
 import os
-from typing import Dict, List
+from typing import Dict
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -107,12 +107,12 @@ def display_lineage(lineage: Dict):
     print(f"🔖 Data Version: {lineage['data_version']}")
 
     # Métriques
-    print(f"\n📈 Métriques:")
+    print("\n📈 Métriques:")
     for metric_name, metric_value in lineage["metrics"].items():
         print(f"   • {metric_name}: {metric_value:.4f}")
 
     # Datasets
-    print(f"\n📦 Datasets utilisés:")
+    print("\n📦 Datasets utilisés:")
     if isinstance(lineage["datasets"], list) and lineage["datasets"]:
         for dataset in lineage["datasets"]:
             print(f"\n   Dataset: {dataset['name']}")
@@ -123,7 +123,7 @@ def display_lineage(lineage: Dict):
         print(f"   {lineage['datasets']}")
 
     # Métadonnées DVC
-    print(f"\n🔐 Métadonnées DVC:")
+    print("\n🔐 Métadonnées DVC:")
     if lineage["dvc_metadata"]:
         for key, value in lineage["dvc_metadata"].items():
             print(f"   • {key}: {value}")
@@ -131,12 +131,12 @@ def display_lineage(lineage: Dict):
         print("   Aucune métadonnée DVC trouvée")
 
     # Infos DagHub
-    print(f"\n🌐 DagHub Information:")
+    print("\n🌐 DagHub Information:")
     print(f"   Repository: {lineage['dagshub_info']['repo']}")
     print(f"   URL: {lineage['dagshub_info']['repo_url']}")
 
     if lineage["dagshub_info"]["data_urls"]:
-        print(f"\n   📍 URLs vers les versions de données:")
+        print("\n   📍 URLs vers les versions de données:")
         for dataset_name, url in lineage["dagshub_info"]["data_urls"].items():
             print(f"\n   {dataset_name}:")
             print(f"   └─ {url}")
@@ -178,10 +178,11 @@ def compare_data_versions(
                 prev_version = runs[i - 2].data.params.get("data_version", "N/A")
                 if data_version != prev_version:
                     print(
-                        f"   ⚠️  Changement de données détecté (précédent: {prev_version})"
+                        "   ⚠️  Changement de données détecté "
+                        f"(précédent: {prev_version})"
                     )
                 else:
-                    print(f"   ✓ Même version de données que le run précédent")
+                    print("   ✓ Même version de données que le run précédent")
 
         print("\n" + "=" * 80 + "\n")
 

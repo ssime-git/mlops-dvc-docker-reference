@@ -8,8 +8,6 @@ services:
         volumes:
             # Mount workspace
             - .:/workspace
-            # CRITICAL: Mount Docker socket (research why!)
-            - /var/run/docker.sock:/var/run/docker.sock
             # Shared volumes for pipeline data
             - ./data:/workspace/data
             - ./models:/workspace/models
@@ -36,6 +34,7 @@ services:
         image: mlops-ingest
         volumes:
             - ./data:/data
+        user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
         networks:
             - mlops-network
 
@@ -46,6 +45,7 @@ services:
         image: mlops-preprocess
         volumes:
             - ./data:/data
+        user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
         networks:
             - mlops-network
 
@@ -57,6 +57,7 @@ services:
         volumes:
             - ./data:/data
             - ./models:/models
+        user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
         environment:
             - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
             - MLFLOW_TRACKING_USERNAME=${DAGSHUB_USER_NAME}
@@ -73,6 +74,7 @@ services:
             - ./data:/data
             - ./models:/models
             - ./metrics:/metrics
+        user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
         environment:
             - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
             - MLFLOW_TRACKING_USERNAME=${DAGSHUB_USER_NAME}
@@ -85,5 +87,6 @@ networks:
         driver: bridge
 # Usage:
 # docker-compose build                    # Build all images
-# docker-compose run dvc-runner dvc repro # Run pipeline
+# make run                               # Run pipeline from host with DVC
+# make run-nested                        # Run pipeline via dvc-runner + docker socket override
 # docker-compose run ingest python ingest.py  # Test individual stage

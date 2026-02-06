@@ -2,6 +2,7 @@ stages:
     ingest:
         cmd: >
             docker run --rm
+            -u $HOST_UID:$HOST_GID
             -v $PROJECT_PATH/data:/data
             mlops-ingest
             python ingest.py
@@ -13,6 +14,7 @@ stages:
     preprocess:
         cmd: >
             docker run --rm
+            -u $HOST_UID:$HOST_GID
             -v $PROJECT_PATH/data:/data
             mlops-preprocess
             python preprocess.py
@@ -26,6 +28,7 @@ stages:
     train:
         cmd: >
             docker run --rm
+            -u $HOST_UID:$HOST_GID
             -v $PROJECT_PATH/data:/data
             -v $PROJECT_PATH/models:/models
             -v $PROJECT_PATH:/workspace:ro
@@ -48,6 +51,7 @@ stages:
     evaluate:
         cmd: >
             docker run --rm
+            -u $HOST_UID:$HOST_GID
             -v $PROJECT_PATH/data:/data
             -v $PROJECT_PATH/models:/models
             -v $PROJECT_PATH/metrics:/metrics

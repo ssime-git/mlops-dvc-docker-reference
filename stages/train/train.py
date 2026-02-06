@@ -4,6 +4,7 @@ Train stage: Train model and log to MLflow/DagsHub with promotion logic
 
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -24,14 +25,11 @@ logger = logging.getLogger(__name__)
 
 def get_git_commit():
     """Get current git commit hash from workspace"""
-    try:
-        # Configure git to trust workspace directory
-        subprocess.run(
-            ["git", "config", "--global", "--add", "safe.directory", "/workspace"],
-            stderr=subprocess.DEVNULL,
-        )
+    env_commit = os.getenv("GIT_COMMIT")
+    if env_commit:
+        return env_commit.strip()
 
-        # Get commit hash
+    try:
         commit = (
             subprocess.check_output(
                 ["git", "rev-parse", "HEAD"],
@@ -65,9 +63,12 @@ def get_production_model_version(client, model_name):
         mv = client.get_model_version_by_alias(model_name, "production")
         run = client.get_run(mv.run_id)
         prod_accuracy = run.data.metrics.get("test_accuracy")
-        logger.info(
-            f"Production model (v{mv.version}): test_accuracy={prod_accuracy:.4f}"
-        )
+        if prod_accuracy is None:
+            logger.info(f"Production model (v{mv.version}) has no test_accuracy metric")
+        else:
+            logger.info(
+                f"Production model (v{mv.version}): test_accuracy={prod_accuracy:.4f}"
+            )
         return mv.version, prod_accuracy
     except mlflow.exceptions.RestException:
         logger.info("No production model found")
@@ -145,7 +146,9 @@ def promote_model(
     if current_accuracy > prod_accuracy:
         # New model is better, promote it
         logger.info(
-            f"New model better ({current_accuracy:.4f} > {prod_accuracy:.4f}), promoting to production"
+            "New model better "
+            f"({current_accuracy:.4f} > {prod_accuracy:.4f}), "
+            "promoting to production"
         )
 
         # Archive old production
@@ -162,12 +165,36 @@ def promote_model(
     else:
         # Keep in staging
         logger.info(
-            f"New model not better ({current_accuracy:.4f} <= {prod_accuracy:.4f}), keeping in staging"
+            "New model not better "
+            f"({current_accuracy:.4f} <= {prod_accuracy:.4f}), "
+            "keeping in staging"
         )
         set_model_alias(client, model_name, version, "staging")
         tags["promotion_reason"] = "insufficient_accuracy"
         tag_model(client, model_name, version, tags)
         return False
+
+
+def resolve_registered_model_version(client, model_name, run_id):
+    """Resolve the model version created by the current run."""
+    query = f"name='{model_name}' and run_id='{run_id}'"
+    versions = []
+
+    try:
+        versions = client.search_model_versions(query)
+    except Exception as e:
+        logger.warning(f"Primary model-version lookup failed ({query}): {e}")
+
+    if not versions:
+        fallback = client.search_model_versions(f"name='{model_name}'")
+        versions = [mv for mv in fallback if mv.run_id == run_id]
+
+    if not versions:
+        raise RuntimeError(
+            f"Could not resolve model version for model={model_name}, run_id={run_id}"
+        )
+
+    return max(int(mv.version) for mv in versions)
 
 
 def main():
@@ -186,7 +213,10 @@ def main():
     random_state = params.get("random_state", 42)
 
     logger.info(
-        f"Hyperparameters: n_estimators={n_estimators}, max_depth={max_depth}, random_state={random_state}"
+        "Hyperparameters: "
+        f"n_estimators={n_estimators}, "
+        f"max_depth={max_depth}, "
+        f"random_state={random_state}"
     )
 
     # Load data
@@ -285,9 +315,8 @@ def main():
 
         run_id = run.info.run_id
 
-    # Get the model version that was just created
-    model_versions = client.search_model_versions(f"name='{model_name}'")
-    latest_version = max([int(mv.version) for mv in model_versions])
+    # Resolve the model version created by this exact run to avoid race conditions.
+    latest_version = resolve_registered_model_version(client, model_name, run_id)
 
     # Promote model based on comparison
     promoted = promote_model(

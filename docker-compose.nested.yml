@@ -1,0 +1,5 @@
+services:
+    dvc-runner:
+        volumes:
+            # Explicit opt-in for nested container orchestration
+            - /var/run/docker.sock:/var/run/docker.sock

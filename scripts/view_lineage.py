@@ -6,7 +6,6 @@ Shows the connection between DVC data versions and MLflow runs
 
 import os
 import sys
-from pathlib import Path
 
 import mlflow
 from mlflow.tracking import MlflowClient

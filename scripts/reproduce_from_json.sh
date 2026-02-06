@@ -12,13 +12,31 @@ if [ ! -f "$FILE" ]; then
 fi
 
 FILE_PATH=$(cd "$(dirname "$FILE")" && pwd)/$(basename "$FILE")
+SOURCE_REPO_ROOT=$(pwd)
+
+# Load repository environment if present.
+if [ -f "$SOURCE_REPO_ROOT/.env" ]; then
+  set -a
+  . "$SOURCE_REPO_ROOT/.env"
+  set +a
+fi
+
+if command -v uvx >/dev/null 2>&1; then
+  DVC_HOST_CMD=(uvx dvc)
+elif command -v dvc >/dev/null 2>&1; then
+  DVC_HOST_CMD=(dvc)
+else
+  echo "Neither 'uvx' nor 'dvc' is available on host" >&2
+  exit 1
+fi
 
 commit=$(FILE="$FILE_PATH" python3 - <<'PY'
 import json, os
 from pathlib import Path
 p = Path(os.environ["FILE"])
 data = json.loads(p.read_text())
-print(data.get("git_commit", ""))
+value = data.get("git_commit")
+print(value or "")
 PY
 )
 
@@ -64,6 +82,29 @@ if [ ! -f params.yaml ]; then
   exit 1
 fi
 
+# Older commits may contain absolute host paths in dvc.yaml.
+# Rewrite them to the current worktree path for reproducible execution.
+if [ -f dvc.yaml ]; then
+  SOURCE_ROOT="$SOURCE_REPO_ROOT" WORKTREE_ROOT="$(pwd)" python3 - <<'PY'
+import os
+from pathlib import Path
+
+dvc_path = Path("dvc.yaml")
+text = dvc_path.read_text()
+source = os.environ["SOURCE_ROOT"]
+target = os.environ["WORKTREE_ROOT"]
+if source in text:
+    text = text.replace(source, target)
+
+# Historical commits may miss uid/gid mapping in docker run commands.
+# Inject host user mapping to avoid root-owned artifacts during host-mode dvc repro.
+if "docker run --rm -u $HOST_UID:$HOST_GID" not in text:
+    text = text.replace("docker run --rm", "docker run --rm -u $HOST_UID:$HOST_GID")
+
+dvc_path.write_text(text)
+PY
+fi
+
 FILE_ENV="$FILE_PATH" python3 - <<'PY'
 import json, os, yaml
 from pathlib import Path
@@ -84,10 +125,18 @@ if [ -z "${DAGSHUB_USER_NAME:-}" ] || [ -z "${DAGSHUB_TOKEN:-}" ]; then
 fi
 
 echo "🔄 Restoring data for data_version=${data_version:-unknown}"
-PROJECT_PATH=$(pwd) docker-compose run --rm dvc-runner dvc pull
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" remote modify origin --local auth basic
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" remote modify origin --local user "$DAGSHUB_USER_NAME"
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" remote modify origin --local password "$DAGSHUB_TOKEN"
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" config cache.type copy --local
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" pull
+mkdir -p data models metrics
+docker run --rm -v "$(pwd):/workspace" alpine:3.20 sh -c \
+  "chown -R $(id -u):$(id -g) /workspace/data /workspace/models /workspace/metrics"
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" unprotect data models metrics >/dev/null 2>&1 || true
 
 echo "▶️  Reproducing pipeline"
-PROJECT_PATH=$(pwd) docker-compose run --rm dvc-runner dvc repro
+PROJECT_PATH=$(pwd) HOST_UID=$(id -u) HOST_GID=$(id -g) "${DVC_HOST_CMD[@]}" repro
 
 echo "✅ Reproduction complete in $worktree_dir (run_id=${run_id:-unknown})"
 echo "To inspect artifacts: ls $worktree_dir/data $worktree_dir/models $worktree_dir/metrics"
