@@ -1,7 +1,8 @@
 schema: '2.0'
 stages:
   ingest:
-    cmd: "docker run --rm -v $PROJECT_PATH/data:/data mlops-ingest python ingest.py\n"
+    cmd: "docker run --rm -u $HOST_UID:$HOST_GID -v $PROJECT_PATH/data:/data mlops-ingest
+      python ingest.py\n"
     deps:
     - path: stages/ingest/ingest.py
       hash: md5
@@ -13,7 +14,8 @@ stages:
       md5: 9b81a5b2beab90b5e381dfb33627d536
       size: 4189
   preprocess:
-    cmd: "docker run --rm -v $PROJECT_PATH/data:/data mlops-preprocess python preprocess.py\n"
+    cmd: "docker run --rm -u $HOST_UID:$HOST_GID -v $PROJECT_PATH/data:/data mlops-preprocess
+      python preprocess.py\n"
     deps:
     - path: data/raw/iris.csv
       hash: md5
@@ -33,7 +35,7 @@ stages:
       md5: 47fd89ce6c52daa555a94670836c67a2
       size: 2237
   train:
-    cmd: "docker run --rm -v $PROJECT_PATH/data:/data -v $PROJECT_PATH/models:/models
+    cmd: "docker run --rm -u $HOST_UID:$HOST_GID -v $PROJECT_PATH/data:/data -v $PROJECT_PATH/models:/models
       -v $PROJECT_PATH:/workspace:ro -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
       -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME} -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       mlops-train python train.py\n"
@@ -48,8 +50,8 @@ stages:
       size: 2237
     - path: stages/train/train.py
       hash: md5
-      md5: 77faab5ddb87681477094a29d36e6f66
-      size: 11033
+      md5: fc9eb1eb3860c64cdc9b42eb43f7c4cd
+      size: 11759
     params:
       params.yaml:
         train.max_depth: 5
@@ -58,10 +60,10 @@ stages:
     outs:
     - path: models/model_metadata.json
       hash: md5
-      md5: 3450110bf95d21e647471e79f35d4c85
+      md5: 04a0c06b0712b36796f72438ffc9c398
       size: 326
   evaluate:
-    cmd: "docker run --rm -v $PROJECT_PATH/data:/data -v $PROJECT_PATH/models:/models
+    cmd: "docker run --rm -u $HOST_UID:$HOST_GID -v $PROJECT_PATH/data:/data -v $PROJECT_PATH/models:/models
       -v $PROJECT_PATH/metrics:/metrics -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
       -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME} -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       mlops-evaluate python evaluate.py\n"
@@ -72,7 +74,7 @@ stages:
       size: 617
     - path: models/model_metadata.json
       hash: md5
-      md5: 3450110bf95d21e647471e79f35d4c85
+      md5: 04a0c06b0712b36796f72438ffc9c398
       size: 326
     - path: stages/evaluate/evaluate.py
       hash: md5
