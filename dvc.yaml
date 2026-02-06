@@ -32,9 +32,9 @@ stages:
             -v $PROJECT_PATH/data:/data
             -v $PROJECT_PATH/models:/models
             -v $PROJECT_PATH:/workspace:ro
-            -e MLFLOW_TRACKING_URI=${mlflow.tracking_uri}
-            -e MLFLOW_TRACKING_USERNAME=${mlflow.tracking_username}
-            -e MLFLOW_TRACKING_PASSWORD=${mlflow.tracking_password}
+            -e MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI
+            -e MLFLOW_TRACKING_USERNAME=$MLFLOW_TRACKING_USERNAME
+            -e MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD
             mlops-train
             python train.py
         deps:
@@ -55,9 +55,9 @@ stages:
             -v $PROJECT_PATH/data:/data
             -v $PROJECT_PATH/models:/models
             -v $PROJECT_PATH/metrics:/metrics
-            -e MLFLOW_TRACKING_URI=${mlflow.tracking_uri}
-            -e MLFLOW_TRACKING_USERNAME=${mlflow.tracking_username}
-            -e MLFLOW_TRACKING_PASSWORD=${mlflow.tracking_password}
+            -e MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI
+            -e MLFLOW_TRACKING_USERNAME=$MLFLOW_TRACKING_USERNAME
+            -e MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD
             mlops-evaluate
             python evaluate.py
         deps:

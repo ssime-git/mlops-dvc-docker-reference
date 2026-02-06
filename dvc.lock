@@ -36,8 +36,8 @@ stages:
       size: 2237
   train:
     cmd: "docker run --rm -u $HOST_UID:$HOST_GID -v $PROJECT_PATH/data:/data -v $PROJECT_PATH/models:/models
-      -v $PROJECT_PATH:/workspace:ro -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
-      -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME} -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+      -v $PROJECT_PATH:/workspace:ro -e MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI -e
+      MLFLOW_TRACKING_USERNAME=$MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD
       mlops-train python train.py\n"
     deps:
     - path: data/processed/test.csv
@@ -50,8 +50,8 @@ stages:
       size: 2237
     - path: stages/train/train.py
       hash: md5
-      md5: fc9eb1eb3860c64cdc9b42eb43f7c4cd
-      size: 11759
+      md5: 2ade192617dc9359f15eaeeb9cf77031
+      size: 11854
     params:
       params.yaml:
         train.max_depth: 5
@@ -60,12 +60,12 @@ stages:
     outs:
     - path: models/model_metadata.json
       hash: md5
-      md5: 04a0c06b0712b36796f72438ffc9c398
+      md5: f14d10a1425aab67101487222ecea55c
       size: 326
   evaluate:
     cmd: "docker run --rm -u $HOST_UID:$HOST_GID -v $PROJECT_PATH/data:/data -v $PROJECT_PATH/models:/models
-      -v $PROJECT_PATH/metrics:/metrics -e MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
-      -e MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME} -e MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+      -v $PROJECT_PATH/metrics:/metrics -e MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI
+      -e MLFLOW_TRACKING_USERNAME=$MLFLOW_TRACKING_USERNAME -e MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD
       mlops-evaluate python evaluate.py\n"
     deps:
     - path: data/processed/test.csv
@@ -74,7 +74,7 @@ stages:
       size: 617
     - path: models/model_metadata.json
       hash: md5
-      md5: 04a0c06b0712b36796f72438ffc9c398
+      md5: f14d10a1425aab67101487222ecea55c
       size: 326
     - path: stages/evaluate/evaluate.py
       hash: md5

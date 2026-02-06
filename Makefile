@@ -1,5 +1,10 @@
 .PHONY: help build run run-nested clean push pull status test test-unit test-pipeline test-pipeline-smoke check-artifacts setup-env ensure-dvc ensure-dvc-perms fix-dvc-perms lint fmt-check
 
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
 DOCKER_COMPOSE ?= docker-compose
 HOST_UID := $(shell id -u)
 HOST_GID := $(shell id -g)
